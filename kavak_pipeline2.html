@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Kavak Pipeline</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f5f5f3;color:#1a1a18;font-size:13px}
+.topbar{background:#fff;border-bottom:1px solid #e5e5e0;padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:10}
+.topbar h1{font-size:15px;font-weight:700}
+.topbar span{font-size:12px;color:#888}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;margin-right:4px}
+.sync-dot.ok{background:#1D9E75}.sync-dot.err{background:#E24B4A}.sync-dot.loading{background:#FFB300}
+.main{padding:16px 20px;max-width:1400px;margin:0 auto}
+.upload-area{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.upload-box{border:2px dashed #ccc;border-radius:10px;padding:18px;text-align:center;cursor:pointer;background:#fff}
+.upload-box:hover{background:#fafaf8}
+.upload-box input{display:none}
+.upload-box b{font-size:13px}
+.upload-box p{font-size:11px;color:#888;margin-top:3px}
+.upload-box .tag{display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px;margin-bottom:6px;font-weight:600}
+.tag-morning{background:#EAF3DE;color:#3B6D11}
+.tag-afternoon{background:#E6F1FB;color:#0C447C}
+.umsg{font-size:11px;margin-top:5px;color:#888}
+.umsg.ok{color:#3B6D11}.umsg.err{color:#A32D2D}
+.new-badge{display:inline-block;font-size:10px;background:#FFB300;color:#fff;padding:1px 7px;border-radius:20px;font-weight:700;margin-left:6px;vertical-align:middle}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.filters select,.filters input{flex:1;min-width:130px;padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:#fff}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px}
+.metric{background:#fff;border-radius:8px;padding:11px 13px;border:1px solid #eee}
+.mlabel{font-size:11px;color:#888;margin-bottom:2px}
+.mval{font-size:21px;font-weight:600}
+.mval.highlight{color:#FFB300}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.chart-box{background:#fff;border-radius:8px;padding:13px;border:1px solid #eee}
+.ctitle{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:9px}
+.bar-row{display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.blabel{width:130px;text-align:right;font-size:11px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bbg{flex:1;height:12px;background:#f0f0ee;border-radius:3px;overflow:hidden}
+.bfill{height:100%;border-radius:3px}
+.bcount{width:24px;text-align:right;font-size:11px;color:#888}
+.table-wrap{background:#fff;border-radius:8px;border:1px solid #eee;overflow:auto;max-height:460px}
+table{width:100%;border-collapse:collapse}
+th{position:sticky;top:0;background:#f8f8f6;padding:8px 10px;text-align:left;font-weight:600;color:#555;border-bottom:1px solid #eee;white-space:nowrap;font-size:12px}
+td{padding:7px 10px;border-bottom:1px solid #f0f0ee;font-size:12px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafaf8}
+tr.is-new td{background:#FFFBEB}
+.badge{display:inline-block;font-size:11px;font-weight:500;padding:2px 9px;border-radius:20px;cursor:pointer;white-space:nowrap}
+.badge:hover{opacity:.8}
+.ag0{color:#3B6D11;font-weight:600}.ag1{color:#BA7517;font-weight:600}.ag2{color:#A32D2D;font-weight:600}
+.note-cell{max-width:200px}
+.note-preview{font-size:11px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+.note-date{font-size:10px;color:#aaa;margin-top:1px}
+.note-btn{font-size:11px;color:#888;cursor:pointer;padding:2px 7px;border:1px solid #ddd;border-radius:5px;background:#fff;white-space:nowrap}
+.note-btn:hover{background:#f0f0ee}
+.note-btn.has-note{color:#1D9E75;border-color:#1D9E75aa}
+.hidden{display:none}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center}
+.modal{background:#fff;border-radius:12px;padding:20px;width:340px;max-height:85vh;overflow-y:auto}
+.modal h3{font-size:14px;font-weight:600;margin-bottom:12px;padding-right:20px}
+.modal-close{float:right;cursor:pointer;color:#aaa;font-size:20px;line-height:1;margin-top:-2px}
+.status-opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;cursor:pointer;margin-bottom:2px}
+.status-opt:hover{background:#f5f5f3}
+.status-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.note-modal{width:380px}
+.note-meta{font-size:11px;color:#888;margin-bottom:10px}
+.note-textarea{width:100%;min-height:110px;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;line-height:1.5}
+.note-textarea:focus{outline:none;border-color:#1D9E75}
+.note-actions{display:flex;gap:8px;margin-top:10px;justify-content:flex-end}
+.btn-save{padding:7px 16px;background:#1a1a18;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px}
+.btn-clear{padding:7px 12px;background:#fff;color:#888;border:1px solid #ddd;border-radius:7px;cursor:pointer;font-size:13px}
+.note-history{margin-top:14px;border-top:1px solid #f0f0ee;padding-top:12px}
+.note-history-title{font-size:11px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+.note-entry{background:#f8f8f6;border-radius:7px;padding:9px 11px;margin-bottom:7px}
+.note-entry-text{font-size:13px;color:#1a1a18;line-height:1.4}
+.note-entry-date{font-size:10px;color:#aaa;margin-top:4px}
+.ai-box{background:#fff;border-radius:10px;border:1px solid #e5e5e0;margin-bottom:14px}
+.ai-header{padding:9px 14px;border-bottom:1px solid #f0f0ee;font-size:12px;font-weight:600;color:#555;display:flex;align-items:center;gap:6px}
+.ai-dot-g{width:8px;height:8px;border-radius:50%;background:#1D9E75}
+.ai-messages{padding:10px 14px;min-height:50px;max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:7px}
+.ai-msg{font-size:13px;line-height:1.5;padding:7px 11px;border-radius:8px;max-width:92%}
+.ai-msg.user{background:#f0f0ee;align-self:flex-end}
+.ai-msg.bot{background:#EAF3DE;align-self:flex-start;color:#27500A}
+.ai-msg.thinking{color:#888;font-style:italic;background:#f8f8f6}
+.ai-sugs{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 8px}
+.sug{font-size:11px;padding:4px 9px;border-radius:20px;border:1px solid #ddd;cursor:pointer;color:#555}
+.sug:hover{background:#f0f0ee}
+.ai-row{display:flex;gap:8px;padding:8px 14px;border-top:1px solid #f0f0ee}
+.ai-row input{flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px}
+.ai-row button{padding:6px 13px;background:#1a1a18;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px}
+.ai-row button:disabled{opacity:.4}
+@media(max-width:640px){.charts{grid-template-columns:1fr}.upload-area{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Kavak Pipeline MX</h1>
+  <span id="dealCount"></span>
+  <span><span class="sync-dot" id="syncDot"></span><span id="syncLabel">Conectando...</span></span>
+  <span id="lastUpdate" style="margin-left:auto;font-size:11px"></span>
+</div>
+
+<div class="main">
+  <div class="upload-area">
+    <div class="upload-box" onclick="document.getElementById('csvMañana').click()">
+      <input type="file" id="csvMañana" accept=".csv" onchange="handleFile(event,'morning')"/>
+      <div class="tag tag-morning">Corte mañana</div>
+      <b>Subir CSV inicial</b>
+      <p>El pipe con el que arrancas el día</p>
+      <div class="umsg" id="msgMorning">Esperando archivo...</div>
+    </div>
+    <div class="upload-box" onclick="document.getElementById('csvTarde').click()">
+      <input type="file" id="csvTarde" accept=".csv" onchange="handleFile(event,'afternoon')"/>
+      <div class="tag tag-afternoon">Corte tarde</div>
+      <b>Subir CSV actualización</b>
+      <p>Solo agrega reservas nuevas del día</p>
+      <div class="umsg" id="msgAfternoon">Carga primero el corte mañana</div>
+    </div>
+  </div>
+
+  <div class="ai-box" id="aiBox" style="display:none">
+    <div class="ai-header"><div class="ai-dot-g"></div>Asistente IA — pregúntale al pipeline</div>
+    <div class="ai-messages" id="aiMessages">
+      <div class="ai-msg bot">Listo. Puedes preguntarme sobre el pipe de tus agentes.</div>
+    </div>
+    <div class="ai-sugs">
+      <span class="sug" onclick="askAI('¿Cuántas reservas nuevas entraron en el corte de la tarde?')">Nuevas reservas</span>
+      <span class="sug" onclick="askAI('¿Quién tiene más deals activos?')">Top asesor</span>
+      <span class="sug" onclick="askAI('¿Cuántos deals pagan hoy?')">Pagan hoy</span>
+      <span class="sug" onclick="askAI('Dame un resumen ejecutivo del pipeline')">Resumen</span>
+    </div>
+    <div class="ai-row">
+      <input id="aiInput" type="text" placeholder="Ej: ¿Cuántas reservas nuevas tenemos hoy?" onkeydown="if(event.key==='Enter')sendAI()"/>
+      <button id="aiBtn" onclick="sendAI()">Enviar</button>
+    </div>
+  </div>
+
+  <div id="dashboard" class="hidden">
+    <div class="filters">
+      <select id="fAsesor" onchange="render()"><option value="">Todos los asesores</option></select>
+      <select id="fEstatus" onchange="render()"><option value="">Todos los estatus</option></select>
+      <select id="fCorte" onchange="render()">
+        <option value="">Todos los cortes</option>
+        <option value="morning">Solo mañana</option>
+        <option value="afternoon">Solo nuevos (tarde)</option>
+      </select>
+      <input id="fQ" type="text" placeholder="Buscar en el pipe..." oninput="render()"/>
+    </div>
+    <div class="metrics" id="metrics"></div>
+    <div class="charts">
+      <div class="chart-box"><div class="ctitle">Por estatus</div><div id="barEM"></div></div>
+      <div class="chart-box"><div class="ctitle">Por asesor</div><div id="barOwner"></div></div>
+    </div>
+    <p style="font-size:11px;color:#aaa;margin-bottom:6px">Clic en estatus para cambiarlo · Clic en "Nota" para agregar comentarios · <span style="background:#FFFBEB;padding:1px 6px;border-radius:4px;color:#BA7517">Amarillo</span> = reserva nueva del corte tarde</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Asesor</th><th>Estatus</th><th>Aging</th><th>Método de pago</th><th>F. Reserva</th><th>Corte</th><th>Nota</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal estatus -->
+<div class="modal-bg hidden" id="modalStatus" onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="modal">
+    <span class="modal-close" onclick="document.getElementById('modalStatus').classList.add('hidden')">×</span>
+    <h3>Cambiar estatus</h3>
+    <div id="statusOpts"></div>
+  </div>
+</div>
+
+<!-- Modal notas -->
+<div class="modal-bg hidden" id="modalNote" onclick="if(event.target===this)closeAllModals()">
+  <div class="modal note-modal">
+    <span class="modal-close" onclick="closeAllModals()">×</span>
+    <h3 id="noteTitle">Nota</h3>
+    <div class="note-meta" id="noteMeta"></div>
+    <textarea class="note-textarea" id="noteText" placeholder="Escribe tu nota aquí..."></textarea>
+    <div class="note-actions">
+      <button class="btn-clear" onclick="clearNote()">Borrar nota</button>
+      <button class="btn-save" onclick="saveNote()">Guardar</button>
+    </div>
+    <div class="note-history hidden" id="noteHistory">
+      <div class="note-history-title">Historial</div>
+      <div id="noteHistoryList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────
+const JSONBIN_KEY = '$2a$10$G61NPmdxukqn6BnP5gpVeesDMe.N2RGiRtmBdN0fFuSWEWh/wJ7n.';
+let BIN_ID = null;
+
+const AGENTES = ['Angel Cedillo','Miguel Almeyda','Armando Flores','Mauricio Saúl Orozco','Ada Navarro Crasto','Bryan Cortes','Kelly Hernandez','Gabriel Hoyos','Dana Fernadez','Maximiliano Morales','Victor Ledesma','Ivan Espinosa'];
+const ESTATUS = [
+  {name:'PAGA HOY',color:'#4CAF50'},{name:'PAGA MAÑANA',color:'#81C784'},
+  {name:'PAGO PARCIAL',color:'#64B5F6'},{name:'PAGADO',color:'#1565C0'},
+  {name:'SEGUIMIENTO',color:'#FFB300'},{name:'PROMESA FUTURA',color:'#90CAF9'},
+  {name:'CITA',color:'#1976D2'},{name:'NO CONTESTA',color:'#FF7043'},
+  {name:'SIN CONTACTO',color:'#90A4AE'},{name:'MUTACIÓN',color:'#AB47BC'},
+  {name:'ALIADO',color:'#EC407A'},{name:'KAVAKO',color:'#26A69A'},
+  {name:'MAL ALINEADA HUB',color:'#EF5350'},{name:'CANCELADA',color:'#B71C1C'},
+  {name:'CANCELAR',color:'#FF5722'},{name:'DEVOLUCIÓN',color:'#FF8A65'},
+];
+const ES = {}; ESTATUS.forEach(e => ES[e.name] = e.color);
+const COLORS = ['#378ADD','#1D9E75','#BA7517','#7F77DD','#D85A30','#888780','#639922','#D4537E','#E24B4A','#0F6E56','#533AB7','#085041'];
+const C = {
+  owner:'Reservacion : Opportunity : Opportunity Owner',
+  em:'EM', aging:'Aging',
+  metodo:'Reservacion : Opportunity : Método de pago del Auto',
+  fres:'F. Reserva', stock:'StockId'
+};
+
+let allData = [], overrides = {}, notes = {}, chatHistory = [], editingIdx = null;
+let newStocks = new Set(); // stocks que llegaron en el corte tarde
+
+// ── JSONBin ───────────────────────────────────────────────
+function setSyncStatus(state, label) {
+  const dot = document.getElementById('syncDot');
+  dot.className = 'sync-dot ' + state;
+  document.getElementById('syncLabel').textContent = label;
+}
+
+async function initBin() {
+  setSyncStatus('loading', 'Conectando...');
+  const savedId = localStorage.getItem('kavak_bin_id');
+  if (savedId) { BIN_ID = savedId; await pullFromCloud(); return; }
+  try {
+    const res = await fetch('https://api.jsonbin.io/v3/b', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-Master-Key':JSONBIN_KEY,'X-Bin-Name':'kavak-pipeline'},
+      body: JSON.stringify({notes:{}, overrides:{}})
+    });
+    const data = await res.json();
+    BIN_ID = data.metadata.id;
+    localStorage.setItem('kavak_bin_id', BIN_ID);
+    setSyncStatus('ok', 'Sincronizado');
+  } catch(e) { setSyncStatus('err', 'Sin conexión'); }
+}
+
+async function resetBin() {
+  localStorage.removeItem('kavak_bin_id');
+  BIN_ID = null;
+  notes = {};
+  overrides = {};
+  await initBin();
+}
+
+async function pullFromCloud() {
+  if (!BIN_ID) return;
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+      headers: {'X-Master-Key': JSONBIN_KEY}
+    });
+    const data = await res.json();
+    const record = data.record || {};
+    notes = record.notes || {};
+    overrides = record.overrides || {};
+    Object.keys(notes).forEach(k => { if (!notes[k]?.current) delete notes[k]; });
+    setSyncStatus('ok', 'Sincronizado');
+    if (allData.length) render();
+  } catch(e) { setSyncStatus('err', 'Sin conexión'); }
+}
+
+function closeAllModals() {
+  document.getElementById('modalNote').classList.add('hidden');
+  document.getElementById('modalStatus').classList.add('hidden');
+  editingIdx = null;
+}
+
+async function pushToCloud() {
+  if (!BIN_ID) return;
+  setSyncStatus('loading', 'Guardando...');
+  try {
+    await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json','X-Master-Key':JSONBIN_KEY},
+      body: JSON.stringify({notes, overrides})
+    });
+    setSyncStatus('ok', 'Guardado ✓');
+  } catch(e) { setSyncStatus('err', 'Error al guardar'); }
+}
+
+// Auto-sync cada 30 segundos
+setInterval(pullFromCloud, 30000);
+
+// ── CSV ───────────────────────────────────────────────────
+function parseCSV(txt) {
+  const lines = txt.trim().split('\n');
+  const hdrs = lines[0].split(',').map(h => h.replace(/^"|"$/g,'').trim());
+  return lines.slice(1).filter(l => l.trim()).map((line, ri) => {
+    const cols = []; let cur = '', inQ = false;
+    for (let c of line) {
+      if (c==='"') inQ=!inQ;
+      else if (c===','&&!inQ) {cols.push(cur.trim()); cur='';}
+      else cur+=c;
+    }
+    cols.push(cur.trim());
+    const obj = {_idx: String(ri)};
+    hdrs.forEach((h,i) => obj[h]=(cols[i]||'').replace(/^"|"$/g,'').trim());
+    return obj;
+  });
+}
+
+function filterAgentes(data) {
+  return data.filter(r => AGENTES.some(a =>
+    (r[C.owner]||'').toLowerCase().includes(a.toLowerCase()) ||
+    a.toLowerCase().includes((r[C.owner]||'').toLowerCase())
+  ));
+}
+
+function handleFile(e, corte) {
+  const file = e.target.files[0]; if (!file) return;
+  const msgId = corte === 'morning' ? 'msgMorning' : 'msgAfternoon';
+  const msg = document.getElementById(msgId);
+  msg.textContent = 'Leyendo...'; msg.className = 'umsg';
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const parsed = filterAgentes(parseCSV(ev.target.result));
+
+      if (corte === 'morning') {
+        // Carga inicial — resetea todo
+        allData = parsed.map(r => ({...r, _corte:'morning'}));
+        newStocks = new Set();
+        msg.textContent = `✓ ${allData.length} deals cargados`; msg.className = 'umsg ok';
+      } else {
+        // Corte tarde — solo agrega los nuevos
+        if (!allData.length) { msg.textContent = 'Carga primero el corte mañana'; msg.className = 'umsg err'; return; }
+        const existingStocks = new Set(allData.map(r => r[C.stock]));
+        const nuevos = parsed.filter(r => !existingStocks.has(r[C.stock]));
+        nuevos.forEach(r => { r._corte = 'afternoon'; newStocks.add(r[C.stock]); });
+        allData = [...allData, ...nuevos];
+        msg.textContent = `✓ ${nuevos.length} reservas nuevas agregadas`; msg.className = 'umsg ok';
+      }
+
+      populateFilters(); render();
+      document.getElementById('dashboard').classList.remove('hidden');
+      document.getElementById('aiBox').style.display = 'block';
+      document.getElementById('dealCount').textContent = `${allData.length} deals`;
+      document.getElementById('lastUpdate').textContent = 'Act: ' + new Date().toLocaleString('es-MX',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'});
+    } catch(err) { msg.textContent = 'Error al leer el CSV.'; msg.className = 'umsg err'; }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function getStockKey(r) { return r[C.stock] || r._idx; }
+function getEM(r) { return overrides[getStockKey(r)] || r[C.em] || '—'; }
+
+function populateFilters() {
+  const fA = document.getElementById('fAsesor'), fE = document.getElementById('fEstatus');
+  const owners = [...new Set(allData.map(r => r[C.owner]).filter(Boolean))].sort();
+  fA.innerHTML = '<option value="">Todos los asesores</option>' + owners.map(v=>`<option value="${v}">${v}</option>`).join('');
+  fE.innerHTML = '<option value="">Todos los estatus</option>' + ESTATUS.map(s=>`<option value="${s.name}">${s.name}</option>`).join('');
+}
+
+function getFiltered() {
+  const fA = document.getElementById('fAsesor').value;
+  const fE = document.getElementById('fEstatus').value;
+  const fC = document.getElementById('fCorte').value;
+  const q  = document.getElementById('fQ').value.toLowerCase();
+  return allData.filter(r =>
+    (!fA || r[C.owner]===fA) &&
+    (!fE || getEM(r).toUpperCase()===fE) &&
+    (!fC || r._corte===fC) &&
+    (!q  || [r[C.owner],r[C.stock],r[C.fres]].join(' ').toLowerCase().includes(q))
+  );
+}
+
+function drawBars(id, data, getFn, off) {
+  const cnt = {}; data.forEach(r => { const k=getFn(r)||'—'; cnt[k]=(cnt[k]||0)+1; });
+  const sorted = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const max = sorted[0]?.[1]||1;
+  document.getElementById(id).innerHTML = sorted.map(([k,v],i) => `
+    <div class="bar-row">
+      <div class="blabel" title="${k}">${k}</div>
+      <div class="bbg"><div class="bfill" style="width:${Math.round(v/max*100)}%;background:${ES[k]||COLORS[(i+off)%COLORS.length]}"></div></div>
+      <div class="bcount">${v}</div>
+    </div>`).join('');
+}
+
+function render() {
+  const d = getFiltered();
+  const nuevosCount = allData.filter(r => r._corte==='afternoon').length;
+  document.getElementById('dealCount').textContent = `${allData.length} deals`;
+
+  const pagaHoy   = d.filter(r => getEM(r).toUpperCase()==='PAGA HOY').length;
+  const pagados   = d.filter(r => getEM(r).toUpperCase()==='PAGADO').length;
+  const canceladas= d.filter(r => ['CANCELADA','CANCELAR'].includes(getEM(r).toUpperCase())).length;
+  const agAvg     = d.length ? Math.round(d.reduce((s,r)=>s+(parseInt(r[C.aging])||0),0)/d.length) : 0;
+  const conNota   = d.filter(r => notes[getStockKey(r)]?.current).length;
+
+  document.getElementById('metrics').innerHTML = [
+    ['Total deals', d.length, false],
+    ['Nuevas hoy', nuevosCount, true],
+    ['Pagan hoy', pagaHoy, false],
+    ['Pagados', pagados, false],
+    ['Aging prom.', agAvg+'d', false],
+    ['Con notas', conNota, false],
+  ].map(([l,v,hi])=>`<div class="metric"><div class="mlabel">${l}</div><div class="mval ${hi?'highlight':''}">${v}</div></div>`).join('');
+
+  drawBars('barEM',    d, r => getEM(r), 0);
+  drawBars('barOwner', d, r => r[C.owner], 3);
+
+  document.getElementById('tbody').innerHTML = d.map(r => {
+    const ag = parseInt(r[C.aging])||0;
+    const agCls = ag<=3?'ag0':ag<=7?'ag1':'ag2';
+    const em = getEM(r).toUpperCase();
+    const color = ES[em]||'#ccc';
+    const sk = getStockKey(r);
+    const nota = notes[sk];
+    const hasNota = !!nota?.current;
+    const isNew = r._corte === 'afternoon';
+    return `<tr class="${isNew?'is-new':''}">
+      <td>${r[C.owner]||'—'}</td>
+      <td><span class="badge" style="background:${color}22;color:${color};border:1px solid ${color}66" onclick="openStatus('${r._idx}')">${getEM(r)}</span></td>
+      <td class="${agCls}">${ag}d</td>
+      <td>${r[C.metodo]||'—'}</td>
+      <td>${r[C.fres]||'—'}</td>
+      <td>${isNew?'<span class="new-badge">NUEVA</span>':'Mañana'}</td>
+      <td class="note-cell">
+        ${hasNota?`<div class="note-preview">${nota.current}</div><div class="note-date">${nota.date}</div>`:''}
+        <button class="note-btn ${hasNota?'has-note':''}" onclick="openNote('${r._idx}')">${hasNota?'Editar':'+ Nota'}</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Modal estatus ─────────────────────────────────────────
+function openStatus(idx) {
+  editingIdx = idx;
+  document.getElementById('statusOpts').innerHTML = ESTATUS.map(s=>`
+    <div class="status-opt" onclick="setStatus('${s.name}')">
+      <div class="status-dot" style="background:${s.color}"></div>
+      <div>${s.name}</div>
+    </div>`).join('');
+  document.getElementById('modalStatus').classList.remove('hidden');
+}
+function setStatus(name) {
+  const r = allData.find(x=>x._idx===editingIdx);
+  if (r) { overrides[getStockKey(r)] = name; pushToCloud(); }
+  document.getElementById('modalStatus').classList.add('hidden');
+  render();
+}
+
+// ── Modal notas ───────────────────────────────────────────
+function openNote(idx) {
+  editingIdx = idx;
+  const r = allData.find(x=>x._idx===idx); if (!r) return;
+  const sk = getStockKey(r);
+  const nota = notes[sk]||{};
+  document.getElementById('noteTitle').textContent = `Nota — ${r[C.owner]||'Deal'} · Stock ${r[C.stock]||'—'}`;
+  document.getElementById('noteMeta').textContent = nota.date ? `Última edición: ${nota.date}` : 'Sin notas aún';
+  document.getElementById('noteText').value = nota.current||'';
+  const hist = nota.history||[];
+  const histDiv = document.getElementById('noteHistory');
+  if (hist.length > 0) {
+    histDiv.classList.remove('hidden');
+    document.getElementById('noteHistoryList').innerHTML = hist.slice().reverse().map(h=>`
+      <div class="note-entry">
+        <div class="note-entry-text">${h.text}</div>
+        <div class="note-entry-date">${h.date}</div>
+      </div>`).join('');
+  } else { histDiv.classList.add('hidden'); }
+  document.getElementById('modalNote').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('noteText').focus(),100);
+}
+function saveNote() {
+  const r = allData.find(x=>x._idx===editingIdx); if (!r) return;
+  const sk = getStockKey(r);
+  const text = document.getElementById('noteText').value.trim();
+  if (!text) { clearNote(); return; }
+  const now = new Date().toLocaleString('es-MX',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const prev = notes[sk]||{};
+  const history = prev.history||[];
+  if (prev.current) history.push({text:prev.current, date:prev.date});
+  notes[sk] = {current:text, date:now, history};
+  pushToCloud();
+  document.getElementById('modalNote').classList.add('hidden');
+  render();
+}
+function clearNote() {
+  const r = allData.find(x=>x._idx===editingIdx); if (!r) return;
+  delete notes[getStockKey(r)];
+  pushToCloud();
+  document.getElementById('modalNote').classList.add('hidden');
+  render();
+}
+
+// ── AI ────────────────────────────────────────────────────
+function buildContext() {
+  const byEM={}, byOwner={};
+  allData.forEach(r=>{
+    const em=getEM(r)||'—'; byEM[em]=(byEM[em]||0)+1;
+    const ow=r[C.owner]||'—'; byOwner[ow]=(byOwner[ow]||0)+1;
+  });
+  const nuevos = allData.filter(r=>r._corte==='afternoon').length;
+  const agAvg = allData.length?Math.round(allData.reduce((s,r)=>s+(parseInt(r[C.aging])||0),0)/allData.length):0;
+  const alto = allData.filter(r=>(parseInt(r[C.aging])||0)>10).map(r=>`${r[C.owner]} (${r[C.aging]}d, ${getEM(r)})`).slice(0,15).join(', ');
+  const conNotas = allData.filter(r=>notes[getStockKey(r)]?.current).map(r=>`${r[C.owner]}: "${notes[getStockKey(r)].current.slice(0,60)}"`).slice(0,10).join('\n');
+  return `Eres asistente de ventas de Kavak México. Responde en español, conciso y directo.
+
+PIPELINE — ${allData.length} deals totales | Nuevas hoy (corte tarde): ${nuevos} | Aging prom: ${agAvg} días
+
+POR ESTATUS:\n${Object.entries(byEM).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`  ${k}: ${v}`).join('\n')}
+POR ASESOR:\n${Object.entries(byOwner).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`  ${k}: ${v} deals`).join('\n')}
+AGING >10 DÍAS: ${alto||'Ninguno'}
+NOTAS RECIENTES:\n${conNotas||'Sin notas'}`;
+}
+function addMsg(role, text) {
+  const div=document.createElement('div'); div.className=`ai-msg ${role}`; div.textContent=text;
+  const msgs=document.getElementById('aiMessages'); msgs.appendChild(div); msgs.scrollTop=msgs.scrollHeight; return div;
+}
+function askAI(q){document.getElementById('aiInput').value=q; sendAI();}
+async function sendAI(){
+  const input=document.getElementById('aiInput'), btn=document.getElementById('aiBtn');
+  const q=input.value.trim(); if(!q||!allData.length)return;
+  input.value=''; btn.disabled=true;
+  addMsg('user',q); chatHistory.push({role:'user',content:q});
+  const thinking=addMsg('thinking','Analizando...');
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:buildContext(),messages:chatHistory.slice(-8)})});
+    const data=await res.json();
+    const reply=data.content?.find(b=>b.type==='text')?.text||'No pude procesar.';
+    thinking.remove(); addMsg('bot',reply); chatHistory.push({role:'assistant',content:reply});
+  }catch(err){thinking.textContent='Error al conectar con la IA.';}
+  btn.disabled=false; input.focus();
+}
+
+// ── Init ──────────────────────────────────────────────────
+closeAllModals();
+initBin();
+</script>
+</body>
+</html>
